@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="it"><head><script src="./dnd-local.js"></script><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IDAYASO — Tavolo</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#08070c}
+body{font-family:Georgia,'Times New Roman',serif;color:#e8e2d5;cursor:default}
+body.nocursor{cursor:none}
+#embers{position:fixed;inset:0;z-index:0}
+/* barra data in alto */
+#datebar{position:fixed;top:0;left:0;right:0;z-index:5;text-align:center;padding:14px 20px 26px;
+  background:linear-gradient(#08070ce8,#08070c00);letter-spacing:1px}
+#datebar .d{font-size:21px;color:#d8c690}
+#datebar .m{font-size:14px;color:#8a8478;margin-top:3px}
+#datebar .m .ru{color:#e08080}
+/* stato quiete: titolo */
+#idle{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2;text-align:center}
+#idle h1{font-size:clamp(60px,12vw,150px);font-weight:400;letter-spacing:.14em;color:#e6d39a;
+  text-shadow:0 0 34px #d8a53f55,0 0 90px #d8a53f22;font-variant:small-caps}
+#idle .sub{margin-top:8px;font-size:clamp(14px,2vw,22px);color:#9a917c;font-style:italic;letter-spacing:.3em}
+/* immagine / mappa */
+#stage{position:fixed;inset:0;z-index:1;display:none;align-items:center;justify-content:center;background:#000}
+#stage.on{display:flex}
+#stageimg{max-width:100%;max-height:100%;object-fit:contain}
+/* più immagini in griglia */
+#multi{position:fixed;inset:0;z-index:1;display:none;gap:6px;padding:6px;background:#000}
+#multi.on{display:grid}
+#multi .cell{position:relative;overflow:hidden;border-radius:6px;background:#0a0a0f}
+#multi .cell img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+/* mappa con nebbia */
+#mapstage{position:fixed;inset:0;z-index:1;display:none;background:#000}
+#mapstage.on{display:block}
+#mapcv{width:100%;height:100%;display:block}
+/* regia libera: oggetti posizionati dal DM */
+#freestage{position:fixed;inset:0;z-index:1;display:none;background:#000;overflow:hidden}
+#freestage.on{display:block}
+.fitem{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:flex-start}
+.fitem img{width:100%;flex:1;min-height:0;object-fit:contain;display:block;
+  filter:drop-shadow(0 10px 30px rgba(0,0,0,.85))}
+#caption{position:fixed;bottom:0;left:0;right:0;z-index:6;text-align:center;padding:26px 20px 18px;
+  background:linear-gradient(#00000000,#000000d8);font-size:22px;color:#e6d39a;font-variant:small-caps;letter-spacing:2px;display:none}
+#caption.on{display:block}
+/* combattimento */
+#combat{position:fixed;top:0;right:0;bottom:0;z-index:7;width:min(360px,34vw);display:none;flex-direction:column;
+  background:linear-gradient(270deg,#0d0b12f2,#0d0b12d8 70%,#0d0b1200);padding:80px 22px 24px 34px}
+#combat.on{display:flex}
+#combat .rh{font-size:15px;letter-spacing:4px;color:#b8524a;margin-bottom:14px;font-variant:small-caps}
+#combat .rh b{color:#e6d39a;font-size:22px;margin-left:8px}
+.cbrow{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;margin-bottom:5px;border:1px solid transparent}
+.cbrow.act{background:#e6d39a14;border-color:#e6d39a44;box-shadow:0 0 18px #d8a53f22}
+.cbrow .arrow{width:14px;color:#e6d39a;font-size:13px;visibility:hidden}
+.cbrow.act .arrow{visibility:visible}
+.cbrow .nm{flex:1;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cbrow.pg .nm{color:#cfe3c0}.cbrow.mostro .nm{color:#e0b5ad}.cbrow.png .nm{color:#c9b8e8}
+.cbrow .init{font-size:13px;color:#8a8478;min-width:20px;text-align:right}
+.cbrow .st{font-size:12px;letter-spacing:1px;min-width:64px;text-align:right}
+.st.s4{color:#8fd3a0}.st.s3{color:#d8c690}.st.s2{color:#e0a060}.st.s1{color:#e07060}.st.s0{color:#777;text-decoration:line-through}
+.cbrow .hpbar{width:70px;height:5px;background:#ffffff14;border-radius:3px;overflow:hidden}
+.cbrow .hpbar i{display:block;height:100%;background:linear-gradient(90deg,#4a8f5c,#8fd3a0);border-radius:3px}
+.cbrow .cond{font-size:11px;color:#c98f4a;font-style:italic}
+/* filigrana */
+#wm{position:fixed;bottom:12px;right:16px;z-index:5;font-size:11px;letter-spacing:2px;color:#4a463e;font-family:system-ui}
+/* party view */
+#partyview{position:fixed;inset:0;z-index:2;display:none;background:#08070c;padding:120px 40px 40px;justify-content:center;align-items:center;gap:24px;flex-wrap:wrap}
+#partyview.on{display:flex}
+/* card view (Encyclopedia) */
+#cardstage{position:fixed;inset:0;z-index:3;display:none;background:#08070cf0;justify-content:center;align-items:center;perspective:1000px}
+#cardstage.on{display:flex}
+.big-rpg-card {
+  position:relative; width:min(560px, 84vw); height:min(92vh, 840px);
+  background:
+    radial-gradient(ellipse 70% 40% at 10% 5%, rgba(140,100,50,.18), transparent 60%),
+    radial-gradient(ellipse 55% 35% at 92% 92%, rgba(120,85,40,.20), transparent 60%),
+    radial-gradient(ellipse 45% 22% at 85% 10%, rgba(150,110,60,.12), transparent 60%),
+    radial-gradient(ellipse 30% 18% at 20% 80%, rgba(120,85,40,.12), transparent 60%),
+    linear-gradient(165deg,#ece0c4,#e3d5b4 45%,#d6c7a2);
+  border:1px solid #5a4526; overflow:hidden;
+  box-shadow:0 34px 90px #000000ff, inset 0 0 80px rgba(120,90,45,.3);
+  display:flex; flex-direction:column; padding:26px 30px 18px;
+  font-family:'Georgia','Times New Roman',serif; color:#3a2c18;
+  transform: translateY(100px) rotateX(10deg); opacity:0; transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.6s;
+}
+.big-rpg-card::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.95;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' seed='11'/%3E%3CfeColorMatrix values='0 0 0 0 0.32 0 0 0 0 0.24 0 0 0 0 0.12 0 0 0 0.10 0'/%3E%3C/filter%3E%3Crect width='260' height='260' filter='url(%23n)'/%3E%3C/svg%3E")}
+#cardstage.on .big-rpg-card { transform: translateY(0) rotateX(0); opacity:1; }
+.big-rpg-card::before{content:"";position:absolute;inset:10px;border:1px solid #5a452699;
+  outline:3px double #5a452666;outline-offset:4px;pointer-events:none;z-index:2}
+.bg-cor{position:absolute;font-size:30px;color:#4a3826;opacity:.8;z-index:3;line-height:1;pointer-events:none}
+.bg-cor.c1{top:16px;left:20px}.bg-cor.c2{top:16px;right:20px;transform:scaleX(-1)}
+.bg-cor.c3{bottom:14px;left:20px;transform:scaleY(-1)}.bg-cor.c4{bottom:14px;right:20px;transform:scale(-1)}
+.bg-geo{position:absolute;inset:0;width:100%;height:100%;opacity:.15;z-index:1;pointer-events:none}
+.bg-geo path,.bg-geo circle,.bg-geo line{stroke:#4a3a22;fill:none;stroke-width:.9}
+.big-rpg-card-title {
+  position:relative;z-index:2;font-size:34px; text-align:center; color:#241a0c;
+  font-variant:small-caps; letter-spacing:5px; padding:4px 0 8px;
+  border-bottom:1px solid #5a4526; margin:0 6px 4px;
+}
+.big-rpg-card-title::after{content:"";display:block;height:1px;background:#5a452688;margin-top:3px}
+.bg-note{position:relative;z-index:2;font-family:'Segoe Script','Bradley Hand',cursive;
+  font-size:13px;color:#4a3a22;opacity:.6;line-height:1.5;padding:4px 10px 6px;
+  transform:rotate(-.6deg);max-height:52px;overflow:hidden}
+.bg-imgwrap{position:relative;z-index:2;flex:1;min-height:0;margin:2px 8px 14px}
+.big-rpg-card-img {
+  width:100%;height:100%;border:1px solid #4a3a22;
+  background-size:cover; background-position:center;
+  background-color:#e3d5b4;background-blend-mode:multiply;
+  filter:sepia(.15) contrast(1.05);
+}
+.bg-inset{position:absolute;border:1px solid #3a2c18;outline:3px double #3a2c1877;outline-offset:3px;
+  background-size:380%;background-color:#e3d5b4;background-blend-mode:multiply;
+  filter:sepia(.22) contrast(1.12);box-shadow:4px 6px 16px rgba(40,25,10,.4);z-index:3}
+.bg-inset.eye{left:-6px;bottom:-14px;width:120px;height:88px;background-position:30% 22%}
+.bg-inset.claw{right:-6px;bottom:-14px;width:104px;height:76px;background-position:72% 82%}
+.big-rpg-card-stats {position:relative;z-index:2;font-size:16px; line-height:1.65; display:flex; flex-direction:column; gap:2px;padding:0 10px}
+.big-rpg-card-stats b { color:#7a1f16; font-weight:700; letter-spacing:2px; font-variant:small-caps; }
+.big-rpg-card-desc {
+  position:relative;z-index:2;font-size:14.5px; color:#54422a; font-style:italic; margin-top:8px;
+  border-top:1px dashed #5a452666; padding:8px 10px 0; flex-shrink:0; line-height:1.5;
+}
+.big-rpg-card-actions {
+  position:relative;z-index:2;font-size:13px; margin-top:6px; border-top:1px solid #5a452655; padding:6px 10px 0;
+}
+.big-rpg-card-actions .act { margin:3px 0; }
+.big-rpg-card-actions .act-name { color:#7a1f16; font-weight:700; letter-spacing:.5px; }
+.big-rpg-card-actions .act-desc { color:#4a3a22; }
+.big-rpg-card-credit {
+  position:relative;z-index:2;font-size:11px; color:#7a684a; text-align:right; font-style:italic;
+  margin-top:auto; padding:8px 10px 0;letter-spacing:1.5px;
+}
+.pvcard{width:240px;background:linear-gradient(180deg,#131218,#0a0a0f);border:1px solid #d8a53f44;border-radius:12px;overflow:hidden;box-shadow:0 8px 30px #000;display:flex;flex-direction:column;align-items:center;padding:24px 20px;position:relative;transition:0.3s}
+.pvcard.fainted{filter:grayscale(100%) brightness(0.5)}
+.pvcard .pimg{width:140px;height:140px;border-radius:70px;object-fit:cover;border:2px solid #d8a53f;box-shadow:0 0 20px #d8a53f44;margin-bottom:16px;background:#000;display:flex;align-items:center;justify-content:center;font-size:40px;color:#444}
+.pvcard .n{font-size:22px;color:#e6d39a;font-variant:small-caps;letter-spacing:1px;margin-bottom:4px;text-align:center}
+.pvcard .lvl{font-size:12px;color:#9a917c;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px;text-align:center}
+.pvcard .hpbar{width:100%;height:4px;background:#ffffff14;border-radius:2px;overflow:hidden;margin-bottom:8px}
+.pvcard .hpbar i{display:block;height:100%;background:linear-gradient(90deg,#4a8f5c,#8fd3a0);border-radius:2px;transition:width 0.4s ease}
+.pvcard .hpst{font-size:11px;letter-spacing:1px;text-transform:uppercase;font-weight:bold}
+.pvcard .badges{position:absolute;top:14px;right:14px;display:flex;gap:6px}
+.pvcard .badge{font-size:20px;filter:drop-shadow(0 0 6px #e6d39a)}
+</style></head><body>
+<canvas id="embers"></canvas>
+<div id="datebar"><div class="d" id="dline">—</div><div class="m" id="mline"></div></div>
+<div id="idle"><h1>Idayaso</h1><div class="sub">LE VENE SI CORROMPONO</div></div>
+<div id="stage"><img id="stageimg" alt=""></div>
+<div id="multi"></div>
+<div id="freestage"></div>
+<div id="partyview"></div>
+<div id="cardstage"><div class="big-rpg-card" id="bigcard"></div></div>
+<div id="mapstage"><canvas id="mapcv"></canvas></div>
+<div id="caption"></div>
+<div id="combat"><div class="rh">⚔ Round <b id="rnd">1</b></div><div id="cblist"></div></div>
+<div id="wm">AZUN.AI · IDAYASO</div>
+<script>
+"use strict";
+var $=function(id){return document.getElementById(id);};
+var esc=function(s){return String(s==null?"":s).replace(/[&<>]/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[m];});};
+
+/* ---- braci ---- */
+var cv=$("embers"),cx=cv.getContext("2d"),P=[];
+function sizeCv(){cv.width=innerWidth;cv.height=innerHeight;}
+sizeCv();addEventListener("resize",sizeCv);
+for(var i=0;i<70;i++)P.push({x:Math.random(),y:Math.random(),s:.4+Math.random()*1.8,v:.0002+Math.random()*.0006,ph:Math.random()*6.28});
+(function loop(){
+  cx.clearRect(0,0,cv.width,cv.height);
+  var t=Date.now()/1000;
+  for(var i=0;i<P.length;i++){var p=P[i];
+    p.y-=p.v;if(p.y<-0.02){p.y=1.02;p.x=Math.random();}
+    var a=.10+.14*Math.abs(Math.sin(t*.8+p.ph));
+    cx.beginPath();cx.arc(p.x*cv.width+Math.sin(t*.4+p.ph)*14,p.y*cv.height,p.s,0,6.29);
+    cx.fillStyle="rgba(216,165,63,"+a+")";cx.fill();}
+  requestAnimationFrame(loop);
+})();
+
+/* ---- calendario di Exandria (data in alto) ---- */
+var WD=["Miresen","Grissen","Whelsen","Conthsen","Folsen","Yulisen","Da'leysen"];
+var MO=[["Horisal",29],["Misuthar",30],["Dualahei",30],["Thunsheer",31],["Unndilar",28],["Brussendar",31],["Sydenstar",32],["Fessuran",29],["Quen'pillar",27],["Cuersaar",29],["Duscar",32]];
+var YEARLEN=MO.reduce(function(a,m){return a+m[1];},0);
+function absDay(y,m,d){var t=y*YEARLEN;for(var i=0;i<m;i++)t+=MO[i][1];return t+(d-1);}
+function moonE(cy,sh,ab){var f=((((ab+sh)%cy)+cy)%cy)/cy;return ["🌑","🌒","🌓","🌔","🌕","🌖","🌗","🌘"][Math.round(f*8)%8];}
+function seasonOf(m){if(m===10||m<=1)return "❄️ Inverno";if(m<=4)return "🌱 Primavera";if(m<=7)return "☀️ Estate";return "🍂 Autunno";}
+async function loadDate(){
+  try{
+    var c=await(await fetch("/dndcal")).json();
+    var ab=absDay(c.year,c.month,c.day);
+    $("dline").textContent=c.day+" "+MO[c.month][0]+" "+c.year+" P.D.";
+    $("mline").innerHTML=esc(WD[((ab+3)%7+7)%7])+" · "+esc(seasonOf(c.month))
+      +" · "+moonE(33,7,ab)+" Catha · <span class='ru'>"+moonE(328,80,ab)+" Ruidus</span>";
+  }catch(e){}
+  setTimeout(loadDate,60000);
+}
+loadDate();
+
+/* ---- stato del tavolo (polling) ---- */
+var last=-1,mapRef="",mapLast=-1,mapState=null,mapImg=null;
+function stWord(f){return f<=0?["A TERRA","s0"]:f<.3?["CRITICO","s1"]:f<.6?["MALCONCIO","s2"]:f<1?["FERITO","s3"]:["ILLESO","s4"];}
+/* parser statblock (stesso formato del /dnd) — serve alla carta gigante */
+function parseSB(text){
+  var lines=String(text||"").replace(/\r/g,"").split("\n"),obj={},i=0;
+  var ind=function(s){return (s.match(/^\s*/)||[""])[0].length;};
+  var kv=function(s){return s.match(/^([\w -]+?):\s*(.*)$/);};
+  while(i<lines.length){
+    var raw=lines[i];if(!raw.trim()){i++;continue;}
+    var base=ind(raw),m=kv(raw.trim());
+    if(!m){i++;continue;}
+    var key=m[1].trim().toLowerCase().replace(/ /g,"_"),val=m[2].trim();
+    if(val===""){
+      var list=[],j=i+1;
+      while(j<lines.length){
+        if(!lines[j].trim()){j++;continue;}
+        if(ind(lines[j])<=base)break;
+        var t=lines[j].trim();
+        if(t.charAt(0)==="-"){
+          var first=t.replace(/^-\s*/,""),item={},fm=kv(first),itemInd=ind(lines[j]);
+          if(fm)item[fm[1].trim().toLowerCase().replace(/ /g,"_")]=fm[2].trim();else item.name=first;
+          j++;
+          while(j<lines.length&&lines[j].trim()&&ind(lines[j])>itemInd&&lines[j].trim().charAt(0)!=="-"){
+            var pm=kv(lines[j].trim());
+            if(pm)item[pm[1].trim().toLowerCase().replace(/ /g,"_")]=pm[2].trim();
+            j++;
+          }
+          list.push(item);
+        }else j++;
+      }
+      obj[key]=list;i=j;continue;
+    }
+    if(/^\[.*\]$/.test(val))obj[key]=val.slice(1,-1).split(",").map(function(x){return x.trim();});
+    else obj[key]=val.replace(/^["']|["']$/g,"");
+    i++;
+  }
+  return obj;
+}
+/* ---- mappa: nebbia opaca + token + griglia ---- */
+function fitRect(iw,ih,W,H){var s=Math.min(W/iw,H/ih);var w=iw*s,h=ih*s;return {x:(W-w)/2,y:(H-h)/2,w:w,h:h};}
+function drawMap(){
+  var cv=$("mapcv");if(!$("mapstage").classList.contains("on"))return;
+  cv.width=innerWidth;cv.height=innerHeight;
+  var cx2=cv.getContext("2d");cx2.clearRect(0,0,cv.width,cv.height);
+  if(!mapImg||!mapImg.complete||!mapImg.naturalWidth)return;
+  var R=fitRect(mapImg.naturalWidth,mapImg.naturalHeight,cv.width,cv.height);
+  cx2.drawImage(mapImg,R.x,R.y,R.w,R.h);
+  var st=mapState||{fog:[],tokens:[],grid:{}};
+  // griglia
+  if(st.grid&&st.grid.on){var gs=(st.grid.size||.05)*R.w;
+    cx2.strokeStyle="rgba(232,226,213,.13)";cx2.lineWidth=1;cx2.beginPath();
+    for(var gx=R.x;gx<=R.x+R.w+1;gx+=gs){cx2.moveTo(gx,R.y);cx2.lineTo(gx,R.y+R.h);}
+    for(var gy=R.y;gy<=R.y+R.h+1;gy+=gs){cx2.moveTo(R.x,gy);cx2.lineTo(R.x+R.w,gy);}
+    cx2.stroke();}
+  // nebbia OPACA per i giocatori: nero pieno, si vede solo il rivelato
+  var off=document.createElement("canvas");off.width=Math.max(1,Math.round(R.w));off.height=Math.max(1,Math.round(R.h));
+  var oc=off.getContext("2d");oc.fillStyle="#000";oc.fillRect(0,0,off.width,off.height);
+  (st.fog||[]).forEach(function(o){
+    oc.globalCompositeOperation=o.t==="r"?"destination-out":"source-over";
+    oc.fillStyle="#000";oc.beginPath();
+    if(o.s==="b")oc.rect(o.x*off.width,o.y*off.height,o.w*off.width,o.h*off.height);
+    else oc.arc(o.x*off.width,o.y*off.height,(o.r||.05)*off.width,0,6.29);
+    oc.fill();});
+  cx2.drawImage(off,R.x,R.y);
+  // token (sopra la nebbia solo se in zona rivelata? i token si vedono sempre: sono la scena)
+  (st.tokens||[]).forEach(function(t){
+    var px=R.x+t.x*R.w,py=R.y+t.y*R.h,r=(t.sz||.03)*R.w;
+    cx2.beginPath();cx2.arc(px,py,r,0,6.29);cx2.fillStyle=t.c||"#e6d39a";
+    cx2.globalAlpha=.92;cx2.fill();cx2.globalAlpha=1;
+    cx2.lineWidth=2;cx2.strokeStyle="#000000aa";cx2.stroke();
+    cx2.font=Math.round(r*1.15)+"px system-ui";cx2.textAlign="center";cx2.textBaseline="middle";
+    cx2.fillText(t.g||"●",px,py+1);
+    if(t.n){cx2.font="600 "+Math.max(11,Math.round(r*.55))+"px system-ui";
+      cx2.fillStyle="#e8e2d5";cx2.shadowColor="#000";cx2.shadowBlur=6;
+      cx2.fillText(t.n,px,py+r+Math.max(10,r*.5));cx2.shadowBlur=0;}
+  });
+}
+addEventListener("resize",drawMap);
+function setMap(ref){
+  if(ref!==mapRef){mapRef=ref;mapLast=-1;mapState=null;
+    mapImg=new Image();mapImg.onload=drawMap;mapImg.src=ref;}
+}
+async function pollMap(){
+  if(!mapRef)return;
+  try{var s=await(await fetch("/dndmap?ref="+encodeURIComponent(mapRef))).json();
+    if(s.updated!==mapLast){mapLast=s.updated;mapState=s;drawMap();}}catch(e){}
+}
+function render(d){
+  var img=d.mode==="image"&&d.image;
+  var multi=d.mode==="multi"&&(d.images||[]).length;
+  var map=d.mode==="map"&&d.mapref;
+  var party=d.mode==="party";
+  var card=d.mode==="card"&&d.card;
+  var free=d.mode==="free"&&(d.freeitems||[]).length;
+  $("stage").classList.toggle("on",!!img);
+  $("multi").classList.toggle("on",!!multi);
+  $("mapstage").classList.toggle("on",!!map);
+  $("partyview").classList.toggle("on",!!party);
+  $("cardstage").classList.toggle("on",!!card);
+  $("freestage").classList.toggle("on",!!free);
+  $("idle").style.display=(img||multi||map||party||card||free)?"none":"flex";
+  $("datebar").style.display=card?"none":"block";   // la carta gigante non va coperta
+  if(free){
+    var items=(d.freeitems||[]).slice().sort(function(a,b){return (a.z||0)-(b.z||0);});
+    var sig=items.map(function(t){return t.id+(t.src||"")+(t.text||"")+(t.type||"")+t.x.toFixed(3)+t.y.toFixed(3)+t.w.toFixed(3)+t.h.toFixed(3)+(t.z||0);}).join("|");
+    if($("freestage").dataset.sig!==sig){
+      $("freestage").dataset.sig=sig;
+      var h="";
+      items.forEach(function(t){
+        h+='<div class="fitem" style="left:'+(t.x*100)+'%;top:'+(t.y*100)+'%;width:'+(t.w*100)+'%;height:'+(t.h*100)+'%">';
+        if(t.type==="text"){
+          h+='<div class="ftext" style="width:100%; height:100%; overflow:hidden; padding:12px; font-size:clamp(12px, 2.2vw, 36px); font-family:\'Georgia\',serif; background:#f4eccd; color:#2d1f10; border:2px solid #8c6e3b; border-radius:6px; box-shadow:0 4px 10px rgba(0,0,0,0.4); box-sizing:border-box; display:flex; align-items:center; justify-content:center; text-align:center; font-style:italic; line-height:1.2; word-break:break-word">'+esc(t.text)+'</div>';
+        } else {
+          h+='<img src="'+esc(t.src)+'" alt="">';
+          if(t.text){
+            h+='<div class="fitem-note" style="width:100%; text-align:center; margin-top:8px; flex:none; font-family:\'Segoe Script\', \'Lucida Handwriting\', \'Georgia\', serif; font-size:clamp(14px, 1.8vw, 32px); color:#f4eccd; font-weight:bold; font-style:italic; text-shadow:1px 1px 3px rgba(0,0,0,0.9); line-height:1.3; word-break:break-word; pointer-events:none">'+esc(t.text)+'</div>';
+          }
+        }
+        h+='</div>';
+      });
+      $("freestage").innerHTML=h;
+    }
+  }
+  
+  if(card){
+    var c = d.card;
+    var iurl = c.img ? "/dndmedia?ref="+encodeURIComponent(c.img) : "";
+    var imgHtml = c.img
+      ? '<div class="bg-imgwrap"><div class="big-rpg-card-img" style="background-image:url(\''+iurl+'\')"></div>'
+        +'<div class="bg-inset eye" style="background-image:url(\''+iurl+'\')"></div>'
+        +'<div class="bg-inset claw" style="background-image:url(\''+iurl+'\')"></div></div>'
+      : '<div class="bg-imgwrap"><div class="big-rpg-card-img" style="display:flex;align-items:center;justify-content:center;font-size:80px;color:#5a4526">✒</div></div>';
+    var statsHtml = "";
+    if(c.lvl) statsHtml += '<div><b>Liv</b> · '+esc(c.lvl)+'</div>';
+    if(c.tipo) statsHtml += '<div><b>Tipo</b> · '+esc(c.tipo)+'</div>';
+    if(c.hab) statsHtml += '<div><b>Habitat</b> · '+esc(c.hab)+'</div>';
+
+    var actsHtml = "";
+    if(c.statblock) {
+      var acts = parseSB(c.statblock);
+      var actionList = acts.actions || [];
+      if(actionList.length) {
+        actsHtml = '<div class="big-rpg-card-actions">';
+        actionList.slice(0,3).forEach(function(a) {
+          if(typeof a === "string") actsHtml += '<div class="act"><span class="act-name">'+esc(a)+'</span></div>';
+          else actsHtml += '<div class="act"><span class="act-name">'+esc(a.name||"")+'. </span><span class="act-desc">'+esc(a.desc||a.text||"")+'</span></div>';
+        });
+        actsHtml += '</div>';
+      }
+    }
+    var geo = '<svg class="bg-geo" viewBox="0 0 560 840" preserveAspectRatio="none">'
+      +'<circle cx="420" cy="300" r="130"/><circle cx="420" cy="300" r="86"/>'
+      +'<line x1="290" y1="300" x2="550" y2="300"/><line x1="420" y1="170" x2="420" y2="430"/>'
+      +'<circle cx="110" cy="620" r="60"/><line x1="40" y1="560" x2="180" y2="680"/>'
+      +'<path d="M40 110 L220 110 L220 250"/><path d="M330 740 h190 M330 756 h190 M330 772 h130"/></svg>';
+    var nota = c.desc || "osservazioni raccolte sul campo…";
+    var creditText = (c.type==="pg" ? "Archivio del Party · Idayaso" : "Bestiario Idayaso");
+    $("bigcard").innerHTML =
+      '<span class="bg-cor c1">❧</span><span class="bg-cor c2">❧</span>'
+      +'<span class="bg-cor c3">❧</span><span class="bg-cor c4">❧</span>'
+      + geo
+      +'<div class="big-rpg-card-title">'+esc(c.name)+'</div>'
+      +'<div class="bg-note">'+esc(nota)+'</div>'
+      + imgHtml
+      +'<div class="big-rpg-card-stats">'+statsHtml+'</div>'
+      + actsHtml
+      +'<div class="big-rpg-card-desc">'+esc(c.desc)+'</div>'
+      +'<div class="big-rpg-card-credit">'+esc(creditText)+' · Tav. I</div>';
+  }
+
+  if(img&&$("stageimg").getAttribute("src")!==d.image)$("stageimg").src=d.image;
+  if(multi){
+    var n=d.images.length,cols=n===1?1:n===2?2:n<=4?2:3;
+    $("multi").style.gridTemplateColumns="repeat("+cols+",1fr)";
+    var h="";d.images.forEach(function(u){h+='<div class="cell"><img src="'+esc(u)+'" alt=""></div>';});
+    if($("multi").dataset.sig!==d.images.join("|")){$("multi").innerHTML=h;$("multi").dataset.sig=d.images.join("|");}
+  }
+  if(map){setMap(d.mapref);pollMap();drawMap();}
+  $("caption").textContent=d.caption||"";
+  $("caption").classList.toggle("on",!!((img||multi||map||free)&&d.caption));
+  var c=d.combat||{};
+  $("combat").classList.toggle("on",!!c.active);
+  if(c.active){
+    $("rnd").textContent=c.round||1;
+    var h="";
+    (c.list||[]).forEach(function(x,i){
+      var f=x.maxhp>0?x.hp/x.maxhp:1,sw=stWord(f);
+      h+='<div class="cbrow '+esc(x.type)+(i===c.turn?" act":"")+'"><span class="arrow">▶</span>'
+        +'<span class="init">'+esc(x.init)+'</span><span class="nm">'+esc(x.name)+'</span>';
+      if(x.type==="pg"&&x.maxhp>0)h+='<span class="hpbar"><i style="width:'+Math.max(0,Math.min(100,f*100))+'%"></i></span>';
+      else h+='<span class="st '+sw[1]+'">'+sw[0]+'</span>';
+      h+='</div>';
+      if(x.cond)h+='<div class="cbrow" style="padding:0 10px 6px 34px;margin-top:-6px"><span class="cond">'+esc(x.cond)+'</span></div>';
+    });
+    $("cblist").innerHTML=h;
+  }
+}
+var partyLast=-1;
+function pollParty(){
+  if(!$("partyview").classList.contains("on"))return;
+  fetch("/dndparty").then(function(r){return r.json();}).then(function(p){
+    if(p.updated!==partyLast){
+      partyLast=p.updated;
+      var h="";
+      (p.chars||[]).forEach(function(c){
+        var f=c.maxhp>0?c.hp/c.maxhp:1, sw=stWord(f);
+        h+='<div class="pvcard '+(f<=0?'fainted':'')+'">';
+        h+='<div class="badges">';
+        if(c.insp) h+='<span class="badge" title="Ispirazione">✨</span>';
+        h+='</div>';
+        if(c.portrait) h+='<img class="pimg" src="'+esc(c.portrait)+'">';
+        else h+='<div class="pimg" style="color:#665;font-weight:bold">'+esc(c.name.charAt(0))+'</div>';
+        h+='<div class="n">'+esc(c.name)+'</div>';
+        h+='<div class="lvl">Lv.'+esc(c.lvl||1)+' '+(esc(c.cls)||'')+'</div>';
+        if(c.maxhp>0){
+           h+='<div class="hpbar"><i style="width:'+Math.max(0,Math.min(100,f*100))+'%"></i></div>';
+           h+='<div class="hpst '+sw[1]+'">'+sw[0]+'</div>';
+        }
+        h+='</div>';
+      });
+      $("partyview").innerHTML=h;
+    }
+  }).catch(function(){});
+}
+
+(function tick(){
+  fetch("/dndtable").then(function(r){return r.json();}).then(function(d){
+    if(d.updated!==last){last=d.updated;render(d);}
+    if($("mapstage").classList.contains("on")) pollMap();
+    if($("partyview").classList.contains("on")) pollParty();
+  }).catch(function(){}).then(function(){setTimeout(tick,1200);});
+})();
+
+/* ---- cursore nascosto quando fermo ---- */
+var curT=null;
+addEventListener("mousemove",function(){document.body.classList.remove("nocursor");
+  clearTimeout(curT);curT=setTimeout(function(){document.body.classList.add("nocursor");},2500);});
+curT=setTimeout(function(){document.body.classList.add("nocursor");},2500);
+</script></body></html>
